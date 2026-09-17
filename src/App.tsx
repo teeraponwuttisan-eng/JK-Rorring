@@ -35,7 +35,7 @@ export default function App() {
   const [rules, setRules] = useState<AuthorityRule[]>(mockAuthorityRules);
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [selectedRequest, setSelectedRequest] = useState<ProcurementRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<ProcurementRequest | null>(mockRequests[0]);
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -58,6 +58,25 @@ export default function App() {
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
+  };
+
+  const handleLogAudit = (actionName: string, details: string) => {
+    const newLog: AuditLogEntry = {
+      id: `log-${Date.now()}`,
+      requestId: 'system-config',
+      documentNo: 'SYSTEM-AUTHORITY-MATRIX',
+      timestamp: new Date().toLocaleString('th-TH'),
+      actorId: currentUser.id,
+      actorName: `${currentUser.name} (${currentUser.position})`,
+      actorRole: 'System Administrator / Approver',
+      action: 'SUBMIT_FOR_APPROVAL' as any,
+      details,
+      ipAddress: '192.168.10.12',
+      userAgent: navigator.userAgent,
+      hashSignature: generateHash(),
+    };
+    setAuditLogs(prev => [newLog, ...prev]);
+    showToast('ปรับปรุงผังอำนาจดำเนินการ (Authority Matrix) เรียบร้อยแล้ว');
   };
 
   // Calculate pending count for current user
@@ -355,7 +374,12 @@ export default function App() {
             )}
 
             {activeTab === 'authority_matrix' && (
-              <AuthorityMatrixView rules={rules} />
+              <AuthorityMatrixView 
+                rules={rules} 
+                onUpdateRules={(newRules) => setRules(newRules)}
+                currentUser={currentUser}
+                onLogAudit={handleLogAudit}
+              />
             )}
 
             {activeTab === 'audit_trail' && (
@@ -375,6 +399,7 @@ export default function App() {
         onClose={() => setIsCreateModalOpen(false)}
         currentUser={currentUser}
         onSubmit={handleCreateRequest}
+        rules={rules}
       />
 
       <DigitalSignatureModal

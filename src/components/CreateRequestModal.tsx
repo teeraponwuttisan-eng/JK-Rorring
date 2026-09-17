@@ -16,8 +16,9 @@ import {
   Sparkles,
   UserPlus
 } from 'lucide-react';
-import { ProcurementRequest, UserProfile, CommitteeMemberEntry, CommitteeRole, AttachmentFile } from '../types/procurement';
+import { ProcurementRequest, UserProfile, CommitteeMemberEntry, CommitteeRole, AttachmentFile, AuthorityRule } from '../types/procurement';
 import { mockUsers, mockAuthorityRules } from '../data/mockData';
+import { PROJECT_CATEGORIES } from '../data/categories';
 import { formatCurrency, thaiBahtText } from '../utils/formatters';
 import { SomboonLogo } from './SomboonLogo';
 
@@ -26,6 +27,7 @@ interface CreateRequestModalProps {
   onClose: () => void;
   currentUser: UserProfile;
   onSubmit: (newRequest: ProcurementRequest) => void;
+  rules?: AuthorityRule[];
 }
 
 export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({
@@ -33,6 +35,7 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({
   onClose,
   currentUser,
   onSubmit,
+  rules = mockAuthorityRules,
 }) => {
   if (!isOpen) return null;
 
@@ -59,14 +62,18 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({
     { id: 'att-mock-2', name: 'Budget_Approval_Board_Extract.pdf', size: '1.1 MB', uploadDate: '2026-09-16', category: 'Budget_Approval' }
   ]);
 
-  // Validation
-  const isBudgetUnder1M = budget < 1000000;
-  const isBudgetHighValue = budget > 10000000;
-  const totalManagersCount = 1 + selectedMemberIds.length; // chairman + members
-  const isCommitteeValid = totalManagersCount >= 5 && !!selectedObserverId && !!selectedSecretaryId;
+  // Find matching Authority Rule dynamically from rules prop
+  const targetRule = rules.find(r => {
+    if (r.maxBudget === null) {
+      return budget >= r.minBudget;
+    }
+    return budget >= r.minBudget && budget <= r.maxBudget;
+  }) || rules[0] || mockAuthorityRules[0];
 
-  // Generate Workflow based on budget
-  const targetRule = isBudgetHighValue ? mockAuthorityRules[1] : mockAuthorityRules[0];
+  const isBudgetUnder1M = budget < 1000000;
+  const totalManagersCount = 1 + selectedMemberIds.length; // chairman + members
+  const minRequiredManagers = targetRule?.minCommitteeMembers || 5;
+  const isCommitteeValid = totalManagersCount >= minRequiredManagers && (!targetRule?.mustIncludeAuditObserver || !!selectedObserverId) && !!selectedSecretaryId;
 
   const handleAddMember = (userId: string) => {
     if (!selectedMemberIds.includes(userId) && userId !== selectedChairmanId && userId !== selectedObserverId) {
@@ -283,18 +290,22 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  หมวดหมู่โครงการ <span className="text-rose-500">*</span>
+                  หมวดหมู่โครงการ ({PROJECT_CATEGORIES.length} หมวดหมู่) <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 bg-sky-50/30 border border-sky-200/80 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-blue-500 transition"
+                  className="w-full px-3.5 py-2.5 bg-sky-50/30 border border-sky-200/80 rounded-xl text-sm text-slate-900 font-medium focus:bg-white focus:border-blue-500 transition"
                 >
-                  <option value="Engineering & Machinery">Engineering & Machinery (เครื่องจักรและวิศวกรรม)</option>
-                  <option value="Energy & Utilities">Energy & Utilities (พลังงานและสาธารณูปโภค)</option>
-                  <option value="Supply Chain Logistics">Supply Chain Logistics (คลังและโลจิสติกส์)</option>
-                  <option value="Factory Expansion">Factory Expansion (ปรับปรุงขยายโรงงาน)</option>
-                  <option value="IT & Digital Infrastructure">IT & Digital Infrastructure (ระบบไอทีองค์กร)</option>
+                  {Array.from(new Set(PROJECT_CATEGORIES.map(c => c.groupTh))).map((group) => (
+                    <optgroup key={group} label={group} className="font-bold text-slate-900">
+                      {PROJECT_CATEGORIES.filter(c => c.groupTh === group).map((cat) => (
+                        <option key={cat.id} value={cat.id} className="font-normal text-slate-700">
+                          {cat.labelTh} ({cat.labelEn})
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
 

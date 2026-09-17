@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { ProcurementRequest, UserProfile } from '../types/procurement';
 import { formatCurrency, formatThaiDate, getStatusBadge } from '../utils/formatters';
+import { PROJECT_CATEGORIES, getCategoryMeta } from '../data/categories';
 import { SomboonLogo } from './SomboonLogo';
 
 interface DashboardViewProps {
@@ -220,13 +221,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="text-xs bg-sky-50/50 border border-sky-200/70 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white"
+              className="text-xs bg-sky-50/50 border border-sky-200/70 rounded-xl px-3 py-2 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white"
             >
-              <option value="all">ทุกหมวดหมู่งาน (All Categories)</option>
-              <option value="Engineering & Machinery">Engineering & Machinery</option>
-              <option value="Energy & Utilities">Energy & Utilities</option>
-              <option value="Supply Chain Logistics">Supply Chain Logistics</option>
-              <option value="IT & Digital Infrastructure">IT & Digital Infrastructure</option>
+              <option value="all">ทุกหมวดหมู่งาน ({PROJECT_CATEGORIES.length} หมวดหมู่)</option>
+              {Array.from(new Set(PROJECT_CATEGORIES.map(c => c.groupTh))).map((group) => (
+                <optgroup key={group} label={group} className="font-bold text-slate-900">
+                  {PROJECT_CATEGORIES.filter(c => c.groupTh === group).map((cat) => (
+                    <option key={cat.id} value={cat.id} className="font-normal text-slate-700">
+                      {cat.labelTh} ({cat.labelEn})
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
             </select>
           </div>
         </div>
@@ -300,6 +306,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         ) : (
           filteredRequests.map((req) => {
             const badge = getStatusBadge(req.status);
+            const catMeta = getCategoryMeta(req.category);
             const currentStep = req.approvalWorkflow[req.currentStepIndex];
             const isMyTurnToSign = 
               req.status === 'pending_approval' && 
@@ -325,8 +332,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
                         {badge.label}
                       </span>
-                      <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-md font-medium">
-                        {req.category}
+                      <span className={`text-xs px-2.5 py-0.5 rounded-md font-semibold border ${catMeta.badgeBg} ${catMeta.badgeText} ${catMeta.badgeBorder}`}>
+                        {catMeta.labelTh}
                       </span>
                       {hasDelegatedMember && (
                         <span className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-0.5 rounded-full font-semibold flex items-center space-x-1">

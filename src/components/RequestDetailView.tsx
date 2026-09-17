@@ -19,10 +19,17 @@ import {
   AlertTriangle,
   RotateCcw,
   Sparkles,
-  QrCode
+  QrCode,
+  Award,
+  ClipboardCheck,
+  ThumbsUp,
+  FileCheck2,
+  Lock,
+  UserCheck
 } from 'lucide-react';
 import { ProcurementRequest, UserProfile, ApprovalStep } from '../types/procurement';
 import { formatCurrency, formatThaiDate, getStatusBadge, getRoleLabelThai, thaiBahtText } from '../utils/formatters';
+import { getCategoryMeta } from '../data/categories';
 import { InternalMemoDocument } from './InternalMemoDocument';
 import { SomboonLogo } from './SomboonLogo';
 
@@ -45,12 +52,24 @@ export const RequestDetailView: React.FC<RequestDetailViewProps> = ({
   onRequestRevision,
   onSimulateException,
 }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'memo' | 'workflow' | 'audit'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'committee_approval' | 'workflow' | 'memo'>('committee_approval');
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [revisionComment, setRevisionComment] = useState('');
   const [showRevisionBox, setShowRevisionBox] = useState(false);
 
+  // Local state for committee votes
+  const [committeeVotes, setCommitteeVotes] = useState<Record<string, { status: 'approved' | 'noted' | 'pending'; score: number; comment: string; signedAt?: string }>>({
+    'usr-005': { status: 'approved', score: 96, comment: 'ผ่านเกณฑ์ข้อกำหนดด้านเทคนิคและประสิทธิภาพเครื่องจักรครบถ้วนตาม TOR', signedAt: '16 ก.ย. 2569 11:30' },
+    'usr-006': { status: 'approved', score: 92, comment: 'สเปคตรงตามแบบโรงงาน วางระบบความปลอดภัยได้ตามมาตรฐานสากล', signedAt: '16 ก.ย. 2569 13:15' },
+    'usr-007': { status: 'approved', score: 90, comment: 'ผ่านการตรวจสอบความคุ้มค่าและ ROI ระยะเวลาคืนทุน 2.4 ปี', signedAt: '16 ก.ย. 2569 14:00' },
+    'usr-009': { status: 'approved', score: 94, comment: 'ผ่านเกณฑ์การบำรุงรักษา มีอะไหล่สำรองและ Warranty 3 ปี', signedAt: '16 ก.ย. 2569 14:45' },
+    'usr-001': { status: 'approved', score: 95, comment: 'ยืนยันความถูกต้องของ TOR และเงื่อนไขสัญญาจัดจ้าง', signedAt: '16 ก.ย. 2569 10:00' },
+    'usr-008': { status: 'approved', score: 98, comment: 'กระบวนการคัดเลือกเป็นไปตามระเบียบ PM-01 โปร่งใส ตรวจสอบได้', signedAt: '16 ก.ย. 2569 15:20' },
+    'usr-010': { status: 'approved', score: 95, comment: 'รวบรวมเอกสารการประชุมและบันทึกมติคณะกรรมการครบถ้วนสมบูรณ์', signedAt: '16 ก.ย. 2569 15:30' }
+  });
+
+  const catMeta = getCategoryMeta(request.category);
   const badge = getStatusBadge(request.status);
   const currentStep = request.approvalWorkflow[request.currentStepIndex];
   
@@ -60,6 +79,24 @@ export const RequestDetailView: React.FC<RequestDetailViewProps> = ({
     currentStep && 
     currentStep.assignedApproverId === currentUser.id && 
     currentStep.status === 'pending';
+
+  // Toggle user's vote if user is in committee
+  const isCurrentUserInCommittee = request.committeeMembers.some(m => m.userId === currentUser.id);
+
+  const handleMemberVote = (memberUserId: string, status: 'approved' | 'noted') => {
+    setCommitteeVotes(prev => ({
+      ...prev,
+      [memberUserId]: {
+        status,
+        score: status === 'approved' ? 95 : 80,
+        comment: status === 'approved' ? 'เห็นชอบผ่านเกณฑ์การพิจารณาคัดเลือก' : 'มีข้อสังเกตเพิ่มเติมด้านการส่งมอบ',
+        signedAt: new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
+      }
+    }));
+  };
+
+  const totalMembers = request.committeeMembers.length;
+  const approvedMembersCount = request.committeeMembers.filter(m => (committeeVotes[m.userId]?.status || 'approved') === 'approved').length;
 
   return (
     <div className="space-y-6 pb-16 font-sans">
@@ -73,12 +110,15 @@ export const RequestDetailView: React.FC<RequestDetailViewProps> = ({
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-xs font-bold text-slate-700 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-200/80">
                 {request.documentNo}
               </span>
               <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
                 {badge.label}
+              </span>
+              <span className={`text-xs px-2.5 py-0.5 rounded-md font-semibold border ${catMeta.badgeBg} ${catMeta.badgeText} ${catMeta.badgeBorder}`}>
+                {catMeta.labelTh}
               </span>
               {request.urgentLevel !== 'normal' && (
                 <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-full uppercase">
@@ -106,7 +146,22 @@ export const RequestDetailView: React.FC<RequestDetailViewProps> = ({
       </div>
 
       {/* Main Tabs Navigation */}
-      <div className="flex space-x-2 border-b border-sky-100 text-xs font-medium">
+      <div className="flex flex-wrap gap-2 border-b border-sky-100 text-xs font-medium">
+        <button
+          onClick={() => setActiveTab('committee_approval')}
+          className={`pb-3 px-3.5 transition-all border-b-2 flex items-center space-x-1.5 ${
+            activeTab === 'committee_approval'
+              ? 'border-blue-600 text-blue-700 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <ClipboardCheck className="w-4 h-4" />
+          <span>หน้า อนุมัติ / มติของคณะกรรมการ (Committee Review & Approval)</span>
+          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+            {approvedMembersCount}/{totalMembers}
+          </span>
+        </button>
+
         <button
           onClick={() => setActiveTab('info')}
           className={`pb-3 px-3.5 transition-all border-b-2 flex items-center space-x-1.5 ${
@@ -128,7 +183,7 @@ export const RequestDetailView: React.FC<RequestDetailViewProps> = ({
           }`}
         >
           <ShieldCheck className="w-4 h-4" />
-          <span>สายการอนุมัติดิจิทัล (Approval Chain)</span>
+          <span>สายการอนุมัติดิจิทัล (Authority Chain)</span>
         </button>
 
         <button
@@ -154,7 +209,7 @@ export const RequestDetailView: React.FC<RequestDetailViewProps> = ({
                 <span>ถึงลำดับการลงนามอนุมัติของท่าน: ขั้นที่ {currentStep.stepNumber} ({currentStep.roleTitle})</span>
               </div>
               <p className="text-xs text-amber-900/80 mt-1">
-                ท่านเข้าสู่ระบบในฐานะ <strong className="underline font-bold">{currentUser.name}</strong> ({currentUser.position}) กรุณาตรวจสอบรายละเอียดโครงการและรายชื่อคณะกรรมการก่อนลงนาม
+                ท่านเข้าสู่ระบบในฐานะ <strong className="underline font-bold">{currentUser.name}</strong> ({currentUser.position}) กรุณาตรวจสอบผลการพิจารณาของคณะกรรมการก่อนลงนาม
               </p>
             </div>
 
@@ -246,6 +301,212 @@ export const RequestDetailView: React.FC<RequestDetailViewProps> = ({
         </div>
       )}
 
+      {/* TAB: COMMITTEE APPROVAL & REVIEW PAGE (หน้า อนุมัติ ของคณะกรรมการ) */}
+      {activeTab === 'committee_approval' && (
+        <div className="space-y-6">
+          
+          {/* Header Banner for Committee Resolution */}
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-[#1e3a8a] text-white rounded-3xl p-6 sm:p-7 shadow-lg border border-blue-800 relative overflow-hidden">
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center space-x-2 bg-white/15 px-3 py-1 rounded-full text-xs font-semibold text-sky-200 mb-2">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>มติผลการพิจารณาและการลงนามของคณะกรรมการ (PM-01 Committee Quorum)</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+                  ผลการพิจารณาและลงนามอนุมัติของคณะกรรมการ {request.committeeMembers.length} ท่าน
+                </h2>
+                <p className="text-xs text-sky-100/90 mt-1 max-w-2xl">
+                  คณะกรรมการคัดเลือกและตรวจรับงานได้ตรวจสอบคุณสมบัติของผู้เสนอราคา ขอบเขตงาน (TOR) ความคุ้มค่าทางเศรษฐศาสตร์ และมาตรฐานความปลอดภัยเรียบร้อยแล้ว
+                </p>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl flex items-center space-x-4 self-start md:self-center">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold text-xl shadow-xs">
+                  <Award className="w-7 h-7" />
+                </div>
+                <div>
+                  <div className="text-[11px] text-sky-200 uppercase tracking-wider font-semibold">สถานะมติที่ประชุม</div>
+                  <div className="text-base font-bold text-emerald-300">
+                    มติเห็นชอบเอกฉันท์ ({approvedMembersCount}/{totalMembers})
+                  </div>
+                  <div className="text-[10px] text-sky-200">คะแนนประเมินเฉลี่ย: 94.4 / 100</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Committee Evaluation Criteria Matrix */}
+          <div className="bg-white/95 backdrop-blur-md p-6 rounded-2xl border border-sky-100 shadow-xs space-y-4">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2 border-b border-sky-100 pb-3">
+              <ClipboardCheck className="w-4 h-4 text-blue-600" />
+              <span>เกณฑ์การประเมินและตรวจรับงานโครงการ (Evaluation & Inspection Criteria)</span>
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <div className="bg-sky-50/60 p-3.5 rounded-xl border border-sky-100">
+                <div className="font-bold text-blue-900">1. ข้อกำหนดทางเทคนิค (TOR)</div>
+                <div className="text-slate-600 text-[11px] mt-1">สเปคเครื่องจักร/ระบบงานตรงตามเกณฑ์ 100%</div>
+                <div className="mt-2 text-emerald-600 font-bold flex items-center space-x-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>ผ่านเกณฑ์ประเมิน</span>
+                </div>
+              </div>
+
+              <div className="bg-sky-50/60 p-3.5 rounded-xl border border-sky-100">
+                <div className="font-bold text-blue-900">2. ความคุ้มค่างบประมาณ (Cost)</div>
+                <div className="text-slate-600 text-[11px] mt-1">อยู่ในกรอบงบ {formatCurrency(request.budget)} (ROI 2.4 ปี)</div>
+                <div className="mt-2 text-emerald-600 font-bold flex items-center space-x-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>ผ่านเกณฑ์ประเมิน</span>
+                </div>
+              </div>
+
+              <div className="bg-sky-50/60 p-3.5 rounded-xl border border-sky-100">
+                <div className="font-bold text-blue-900">3. กำหนดส่งมอบงาน (Lead Time)</div>
+                <div className="text-slate-600 text-[11px] mt-1">กำหนดเสร็จ: {request.targetCompletionDate || '31 มี.ค. 2570'}</div>
+                <div className="mt-2 text-emerald-600 font-bold flex items-center space-x-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>ผ่านเกณฑ์ประเมิน</span>
+                </div>
+              </div>
+
+              <div className="bg-sky-50/60 p-3.5 rounded-xl border border-sky-100">
+                <div className="font-bold text-blue-900">4. ธรรมาภิบาล & ESG (PM-01)</div>
+                <div className="text-slate-600 text-[11px] mt-1">ตรวจทานโดย IA Napaporn โปร่งใส ไร้ส่วนได้เสีย</div>
+                <div className="mt-2 text-emerald-600 font-bold flex items-center space-x-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>ผ่านเกณฑ์ประเมิน</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Individual Committee Member Approval Cards */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+                <Users className="w-4 h-4 text-blue-600" />
+                <span>รายชื่อและลายมือชื่ออิเล็กทรอนิกส์ของคณะกรรมการแต่ละท่าน ({request.committeeMembers.length} ท่าน)</span>
+              </h3>
+              <div className="text-xs text-slate-500">
+                คลิกเพื่อจำลองการลงนามหรือบันทึกความเห็น
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {request.committeeMembers.map((member, idx) => {
+                const vote = committeeVotes[member.userId] || {
+                  status: 'approved',
+                  score: 95,
+                  comment: 'เห็นชอบตามข้อเสนอและระเบียบจัดซื้อจัดจ้าง PM-01',
+                  signedAt: '16 ก.ย. 2569 14:00'
+                };
+                const isChairman = member.role === 'chairman';
+                const isObserver = member.role === 'observer';
+                const isSecretary = member.role === 'secretary';
+
+                return (
+                  <div
+                    key={member.id}
+                    className={`bg-white/95 backdrop-blur-md rounded-2xl border p-5 shadow-xs transition-all ${
+                      isChairman 
+                        ? 'border-amber-300 ring-2 ring-amber-100/70 bg-amber-50/10' 
+                        : isObserver 
+                        ? 'border-sky-300 ring-2 ring-sky-100/70' 
+                        : 'border-sky-100 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs ${
+                          isChairman ? 'bg-amber-500 text-white shadow-xs' :
+                          isObserver ? 'bg-sky-600 text-white shadow-xs' :
+                          isSecretary ? 'bg-indigo-600 text-white shadow-xs' : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-900 text-sm flex flex-wrap items-center gap-1.5">
+                            <span>{member.user.name}</span>
+                            {isChairman && (
+                              <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.2 rounded-full border border-amber-200">
+                                👑 ประธานกรรมการ
+                              </span>
+                            )}
+                            {isObserver && (
+                              <span className="text-[10px] bg-sky-100 text-blue-900 font-bold px-2 py-0.2 rounded-full border border-sky-200">
+                                👁️ สังเกตการณ์ (Audit)
+                              </span>
+                            )}
+                            {isSecretary && (
+                              <span className="text-[10px] bg-indigo-100 text-indigo-900 font-bold px-2 py-0.2 rounded-full border border-indigo-200">
+                                ✍️ เลขานุการ
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {member.user.position} • {member.department}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Vote Status Pill */}
+                      <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold flex items-center space-x-1 ${
+                        vote.status === 'approved' 
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                          : 'bg-amber-100 text-amber-800 border border-amber-300'
+                      }`}>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>{vote.status === 'approved' ? 'อนุมัติ / เห็นชอบ' : 'มีข้อสังเกต'}</span>
+                      </span>
+                    </div>
+
+                    {/* Member Review Comment Box */}
+                    <div className="mt-3.5 bg-slate-50/80 rounded-xl p-3 border border-slate-200/70 text-xs text-slate-700">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                        <span>ความเห็นและผลการตรวจรับ:</span>
+                        <span className="text-blue-700 font-bold">คะแนน: {vote.score} / 100</span>
+                      </div>
+                      <p className="italic text-slate-800">
+                        "{vote.comment}"
+                      </p>
+                    </div>
+
+                    {/* Digital Signature & Timestamp */}
+                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                      <div className="flex items-center space-x-1.5 text-blue-700 font-mono text-[10px]">
+                        <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="font-semibold">{member.user.name} [Digitally Signed]</span>
+                      </div>
+                      <div className="text-slate-400">
+                        {vote.signedAt || '16 ก.ย. 2569'}
+                      </div>
+                    </div>
+
+                    {/* Interactive Action for Demo / Testing */}
+                    <div className="mt-3 flex items-center justify-end space-x-2 pt-2 border-t border-slate-100/80">
+                      <button
+                        onClick={() => handleMemberVote(member.userId, 'approved')}
+                        className="text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg border border-emerald-200 font-semibold transition"
+                      >
+                        ✓ ลงมติเห็นชอบ
+                      </button>
+                      <button
+                        onClick={() => handleMemberVote(member.userId, 'noted')}
+                        className="text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-800 px-2.5 py-1 rounded-lg border border-amber-200 font-semibold transition"
+                      >
+                        ✎ มีข้อสังเกต
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TAB 1: INFO & COMMITTEES */}
       {activeTab === 'info' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -275,7 +536,12 @@ export const RequestDetailView: React.FC<RequestDetailViewProps> = ({
                 </div>
                 <div>
                   <span className="text-slate-400 font-medium block">หมวดหมู่งาน:</span>
-                  <span className="text-slate-800 font-semibold">{request.category}</span>
+                  <div className="flex items-center space-x-1.5 mt-0.5">
+                    <span className={`text-xs px-2.5 py-0.5 rounded-md font-semibold border ${catMeta.badgeBg} ${catMeta.badgeText} ${catMeta.badgeBorder}`}>
+                      {catMeta.labelTh}
+                    </span>
+                    <span className="text-slate-500 text-[11px]">({catMeta.groupTh})</span>
+                  </div>
                 </div>
               </div>
 
@@ -550,3 +816,4 @@ export const RequestDetailView: React.FC<RequestDetailViewProps> = ({
     </div>
   );
 };
+

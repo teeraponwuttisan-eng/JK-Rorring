@@ -60,6 +60,23 @@ export interface AttachmentFile {
   category: 'TOR' | 'Budget_Approval' | 'PR_Document' | 'Quotation' | 'Other';
 }
 
+export type ProjectCategory =
+  | 'Engineering & Machinery'
+  | 'Automation & Robotics'
+  | 'Tooling, Moulds & Dies'
+  | 'R&D & Quality Metrology'
+  | 'Energy & Green Utilities'
+  | 'Factory & Facility Expansion'
+  | 'Smart MRO & Spare Parts'
+  | 'Supply Chain & Logistics'
+  | 'Raw Materials & Core Parts'
+  | 'Corporate Fleet & Transport'
+  | 'IT & Digital Infrastructure'
+  | 'Safety, Health & Environment (SHE)'
+  | 'Consulting & Professional Services'
+  | 'Office Facilities & General Services'
+  | (string & {});
+
 export interface ProcurementRequest {
   id: string;
   documentNo: string; // e.g., SOM-MEMO-2026-0042
@@ -70,7 +87,7 @@ export interface ProcurementRequest {
   budget: number;
   objective: string;
   projectScope: string;
-  category: 'Engineering & Machinery' | 'IT & Digital Infrastructure' | 'Factory Expansion' | 'Supply Chain Logistics' | 'Energy & Utilities';
+  category: ProjectCategory;
   targetStartDate: string;
   targetCompletionDate: string;
   status: RequestStatus;

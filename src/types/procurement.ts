@@ -131,14 +131,22 @@ export interface NotificationLog {
 export interface AuthorityRule {
   id: string;
   tierName: string;
+  budgetLabel: string;
   minBudget: number;
   maxBudget: number | null;
+  committeeDescription: string;
+  committeeLevelRequired: string;
+  minCommitteeMembers: number;
+  inspectorsCount: number;
+  appointmentApprover: string;
+  appointmentApproverLevel: string;
+  disputeResolutionApprover: string;
+  disputeResolutionApproverLevel: string;
+  mustIncludeAuditObserver: boolean;
   requiredSteps: {
     stepNumber: number;
     title: string;
     levelRequired: string;
     defaultApproverPosition: string;
   }[];
-  minCommitteeMembers: number;
-  mustIncludeAuditObserver: boolean;
 }

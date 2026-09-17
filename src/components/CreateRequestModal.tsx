@@ -235,23 +235,33 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({
         <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-6 flex-1 text-slate-800">
           
           {/* PM-01 Rule Alert */}
-          {isBudgetUnder1M ? (
-            <div className="bg-amber-50/80 border border-amber-300 rounded-2xl p-4 flex items-start space-x-3 text-amber-950 text-xs">
-              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <strong className="font-bold block text-sm">ข้อสังเกตระเบียบ PM-01:</strong>
-                วงเงินที่ระบุต่ำกว่า 1,000,000 บาท ตามระเบียบ PM-01 ไม่จำเป็นต้องแต่งตั้งคณะกรรมการ 5 ท่าน สามารถจัดซื้อตามกระบวนการปกติได้ (หากต้องการแต่งตั้งตามความสำคัญของโครงการ สามารถดำเนินการต่อได้)
+          <div className="bg-sky-50/90 border border-sky-200 rounded-2xl p-4 flex items-start space-x-3 text-blue-950 text-xs">
+            <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <strong className="font-bold text-sm text-blue-900">
+                  เกณฑ์ระเบียบ PM-01 ({targetRule.budgetLabel || targetRule.tierName}):
+                </strong>
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-bold text-[11px]">
+                  วงเงิน {formatCurrency(budget)} บาท
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-slate-700">
+                <div>
+                  <span className="font-semibold text-blue-900">เกณฑ์กรรมการ: </span>
+                  {targetRule.committeeDescription}
+                </div>
+                <div>
+                  <span className="font-semibold text-blue-900">ผู้อนุมัติแต่งตั้ง: </span>
+                  {targetRule.appointmentApprover}
+                </div>
+                <div>
+                  <span className="font-semibold text-blue-900">ผู้ชี้ขาดไม่เป็นเอกฉันท์: </span>
+                  {targetRule.disputeResolutionApprover}
+                </div>
               </div>
             </div>
-          ) : (
-            <div className="bg-sky-50/80 border border-sky-200 rounded-2xl p-4 flex items-start space-x-3 text-blue-950 text-xs">
-              <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-              <div>
-                <strong className="font-bold block text-sm">เข้าเกณฑ์ระเบียบ PM-01 (วงเงินเกิน 1,000,000 บาท):</strong>
-                ระบบเปิดใช้งานการเลือกคณะกรรมการระดับ Manager อย่างน้อย 5-6 ท่าน พร้อมกำหนดเส้นทางอนุมัติแบบ Digital Approval Loop ถึงระดับ AGM & VP อัตโนมัติ
-              </div>
-            </div>
-          )}
+          </div>
 
           {/* Section 1: ข้อมูลโครงการและงบประมาณ */}
           <div className="space-y-4">

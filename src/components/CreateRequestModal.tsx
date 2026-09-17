@@ -14,7 +14,13 @@ import {
   HelpCircle,
   CheckCircle2,
   Sparkles,
-  UserPlus
+  UserPlus,
+  Layers,
+  Scale,
+  Sliders,
+  ShieldCheck,
+  ChevronRight,
+  Info
 } from 'lucide-react';
 import { ProcurementRequest, UserProfile, CommitteeMemberEntry, CommitteeRole, AttachmentFile, AuthorityRule } from '../types/procurement';
 import { mockUsers, mockAuthorityRules } from '../data/mockData';
@@ -50,6 +56,22 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({
   const [targetStartDate, setTargetStartDate] = useState('2026-10-01');
   const [targetCompletionDate, setTargetCompletionDate] = useState('2027-03-31');
 
+  // Authority Tier Selection Mode: 'auto' or specific rule id
+  const [selectedTierId, setSelectedTierId] = useState<string>('auto');
+
+  // Auto-calculated rule from budget
+  const autoMatchedRule = rules.find(r => {
+    if (r.maxBudget === null) {
+      return budget >= r.minBudget;
+    }
+    return budget >= r.minBudget && budget <= r.maxBudget;
+  }) || rules[0] || mockAuthorityRules[0];
+
+  // Active target rule (user-selected or auto-calculated)
+  const targetRule = selectedTierId === 'auto'
+    ? autoMatchedRule
+    : (rules.find(r => r.id === selectedTierId) || autoMatchedRule);
+
   // Committee selection state
   const [selectedChairmanId, setSelectedChairmanId] = useState<string>('usr-005'); // Kittisak
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(['usr-006', 'usr-007', 'usr-009', 'usr-001']);
@@ -62,18 +84,33 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({
     { id: 'att-mock-2', name: 'Budget_Approval_Board_Extract.pdf', size: '1.1 MB', uploadDate: '2026-09-16', category: 'Budget_Approval' }
   ]);
 
-  // Find matching Authority Rule dynamically from rules prop
-  const targetRule = rules.find(r => {
-    if (r.maxBudget === null) {
-      return budget >= r.minBudget;
-    }
-    return budget >= r.minBudget && budget <= r.maxBudget;
-  }) || rules[0] || mockAuthorityRules[0];
-
-  const isBudgetUnder1M = budget < 1000000;
   const totalManagersCount = 1 + selectedMemberIds.length; // chairman + members
   const minRequiredManagers = targetRule?.minCommitteeMembers || 5;
   const isCommitteeValid = totalManagersCount >= minRequiredManagers && (!targetRule?.mustIncludeAuditObserver || !!selectedObserverId) && !!selectedSecretaryId;
+
+  const handleSelectTier = (tierId: string) => {
+    setSelectedTierId(tierId);
+    if (tierId !== 'auto') {
+      const selected = rules.find(r => r.id === tierId);
+      if (selected) {
+        // If current budget does not fall within the selected tier, adapt budget to tier's typical range
+        if (selected.maxBudget !== null) {
+          if (budget < selected.minBudget || budget > selected.maxBudget) {
+            setBudget(Math.round((selected.minBudget + selected.maxBudget) / 2));
+          }
+        } else {
+          if (budget < selected.minBudget) {
+            setBudget(selected.minBudget + 5000000);
+          }
+        }
+      }
+    }
+  };
+
+  const handleBudgetChange = (newBudget: number) => {
+    setBudget(newBudget);
+    // If auto mode is on, it will automatically compute targetRule
+  };
 
   const handleAddMember = (userId: string) => {
     if (!selectedMemberIds.includes(userId) && userId !== selectedChairmanId && userId !== selectedObserverId) {
@@ -93,7 +130,7 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({
     }
 
     if (!isCommitteeValid) {
-      alert('ระเบียบ PM-01 กำหนดให้มีคณะกรรมการระดับ Manager อย่างน้อย 5-6 ท่าน และกรรมการสังเกตการณ์ (IA)');
+      alert(`ระเบียบ PM-01 กำหนดให้มีคณะกรรมการอย่างน้อย ${minRequiredManagers} ท่าน และกรรมการสังเกตการณ์ (IA)`);
       return;
     }
 
@@ -155,7 +192,7 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({
       department: secUser.department,
     });
 
-    // Build Workflow steps
+    // Build Workflow steps from targetRule
     const workflow = targetRule.requiredSteps.map(step => {
       let approver = mockUsers[0]; // Default requester
       if (step.stepNumber === 2) approver = mockUsers[1]; // AGM Jaturong
@@ -234,30 +271,129 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-6 flex-1 text-slate-800">
           
-          {/* PM-01 Rule Alert */}
-          <div className="bg-sky-50/90 border border-sky-200 rounded-2xl p-4 flex items-start space-x-3 text-blue-950 text-xs">
-            <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <strong className="font-bold text-sm text-blue-900">
-                  เกณฑ์ระเบียบ PM-01 ({targetRule.budgetLabel || targetRule.tierName}):
-                </strong>
-                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-bold text-[11px]">
-                  วงเงิน {formatCurrency(budget)} บาท
-                </span>
+          {/* Box: เลือกประเภท โครงสร้างผังอำนาจดำเนินการตามระเบียบ PM-01 */}
+          <div className="bg-gradient-to-br from-blue-50/90 via-sky-50/70 to-indigo-50/80 border-2 border-blue-200/90 rounded-2xl p-4 sm:p-5 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-200/70 pb-3 mb-3.5">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                  <Sliders className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#1e3a8a] flex items-center gap-1.5">
+                    <span>โครงสร้างผังอำนาจดำเนินการตามระเบียบ PM-01</span>
+                    <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-bold">
+                      {selectedTierId === 'auto' ? 'ระบบตรวจจับอัตโนมัติ' : 'กำหนดประเภทแบบเฉพาะ'}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-600">
+                    เลือกประเภทผังอำนาจตามวงเงินเพื่อกำหนดเกณฑ์กรรมการ ผู้อนุมัติแต่งตั้ง และผู้ชี้ขาดตามคู่มือ PM-01
+                  </p>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-slate-700">
-                <div>
-                  <span className="font-semibold text-blue-900">เกณฑ์กรรมการ: </span>
-                  {targetRule.committeeDescription}
+
+              {/* Quick auto toggle */}
+              {selectedTierId !== 'auto' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedTierId('auto')}
+                  className="text-xs bg-white text-blue-700 hover:bg-blue-50 border border-blue-300 font-bold px-3 py-1.5 rounded-xl transition flex items-center space-x-1 shrink-0 self-start sm:self-auto"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                  <span>คืนค่าตรวจจับตามวงเงินอัตโนมัติ</span>
+                </button>
+              )}
+            </div>
+
+            {/* Dropdown Selector Box */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-blue-950 mb-1.5">
+                  เลือกประเภท โครงสร้างผังอำนาจดำเนินการ (Authority Matrix Tier) <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={selectedTierId}
+                  onChange={(e) => handleSelectTier(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-white border-2 border-blue-300 rounded-xl text-xs sm:text-sm font-bold text-[#1e3a8a] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition shadow-xs"
+                >
+                  <option value="auto">
+                    ✨ ตรวจจับอัตโนมัติตามวงเงินงบประมาณ (ปัจจุบันตรงกับ: {autoMatchedRule.budgetLabel || autoMatchedRule.tierName})
+                  </option>
+                  {rules.map((r, idx) => (
+                    <option key={r.id} value={r.id}>
+                      {idx + 1}. วงเงิน {r.budgetLabel || r.tierName} ➔ {r.committeeDescription} (ผู้อนุมัติ: {r.appointmentApprover})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Visual Tier Pills */}
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-1.5 pt-1">
+                {rules.map((r) => {
+                  const isActive = targetRule.id === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => handleSelectTier(r.id)}
+                      className={`text-left p-2 rounded-xl border text-[11px] transition flex flex-col justify-between ${
+                        isActive
+                          ? 'bg-blue-600 text-white border-blue-700 shadow-xs font-bold'
+                          : 'bg-white/90 hover:bg-white text-slate-700 border-blue-100 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${isActive ? 'bg-blue-800 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                          {r.budgetLabel || r.tierName}
+                        </span>
+                        {isActive && <CheckCircle2 className="w-3 h-3 text-sky-200" />}
+                      </div>
+                      <div className={`mt-1 line-clamp-1 ${isActive ? 'text-sky-100' : 'text-slate-500'}`}>
+                        {r.committeeDescription}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Dynamic Matrix Summary Card */}
+              <div className="bg-white rounded-xl border border-blue-200/90 p-3.5 shadow-xs grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+                  <div className="text-[10px] text-slate-500 font-semibold uppercase flex items-center space-x-1">
+                    <Users className="w-3 h-3 text-blue-600" />
+                    <span>เกณฑ์กรรมการ (PM-01)</span>
+                  </div>
+                  <div className="text-xs font-bold text-[#1e3a8a] mt-0.5">
+                    {targetRule.committeeDescription}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">
+                    ระดับที่ต้องแต่งตั้ง: <strong className="text-slate-700">{targetRule.committeeLevelRequired || 'Manager'}</strong> (ขั้นต่ำ {targetRule.minCommitteeMembers} ท่าน)
+                  </div>
                 </div>
-                <div>
-                  <span className="font-semibold text-blue-900">ผู้อนุมัติแต่งตั้ง: </span>
-                  {targetRule.appointmentApprover}
+
+                <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+                  <div className="text-[10px] text-slate-500 font-semibold uppercase flex items-center space-x-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    <span>ผู้อนุมัติ การแต่งตั้งคณะกรรมการ</span>
+                  </div>
+                  <div className="text-xs font-bold text-emerald-900 mt-0.5">
+                    {targetRule.appointmentApprover}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">
+                    ผู้ลงนามคำสั่งแต่งตั้งเป็นทางการ
+                  </div>
                 </div>
-                <div>
-                  <span className="font-semibold text-blue-900">ผู้ชี้ขาดไม่เป็นเอกฉันท์: </span>
-                  {targetRule.disputeResolutionApprover}
+
+                <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+                  <div className="text-[10px] text-slate-500 font-semibold uppercase flex items-center space-x-1">
+                    <Scale className="w-3 h-3 text-purple-600" />
+                    <span>ผู้อนุมัติ ชี้ขาดกรณีไม่เป็นเอกฉันท์</span>
+                  </div>
+                  <div className="text-xs font-bold text-purple-900 mt-0.5">
+                    {targetRule.disputeResolutionApprover}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">
+                    ผู้มีอำนาจวินิจฉัยและชี้ขาดตามระเบียบ
+                  </div>
                 </div>
               </div>
             </div>
@@ -331,7 +467,7 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({
                     min={100000}
                     step={50000}
                     value={budget}
-                    onChange={(e) => setBudget(Number(e.target.value))}
+                    onChange={(e) => handleBudgetChange(Number(e.target.value))}
                     className="w-full pl-8 pr-3.5 py-2.5 bg-sky-50/30 border border-sky-200/80 rounded-xl text-sm font-bold text-[#1e3a8a] focus:bg-white focus:border-blue-500 transition"
                   />
                   <DollarSign className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -374,31 +510,31 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({
 
           {/* Section 2: คณะกรรมการคัดเลือกและตรวจรับงาน (PM-01 Requirement) */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-sky-100 pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-sky-100 pb-2">
               <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
                 <Users className="w-4 h-4 text-blue-600" />
-                <span>2. รายชื่อคณะกรรมการคัดเลือกและตรวจรับงาน (Manager 5-6 ท่าน)</span>
+                <span>2. รายชื่อคณะกรรมการคัดเลือกและตรวจรับงาน ({targetRule.committeeLevelRequired || 'Manager'} {minRequiredManagers} ท่านขึ้นไป)</span>
               </h3>
               <div className="text-xs">
-                จำนวนกรรมการหลัก: <strong className={totalManagersCount >= 5 ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}>
+                จำนวนกรรมการหลัก: <strong className={totalManagersCount >= minRequiredManagers ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}>
                   {totalManagersCount} ท่าน
-                </strong> (เกณฑ์ขั้นต่ำ 5 ท่าน)
+                </strong> (เกณฑ์ขั้นต่ำตาม PM-01: {minRequiredManagers} ท่าน)
               </div>
             </div>
 
             {/* 1. Chairman */}
             <div className="bg-sky-50/40 p-4 rounded-2xl border border-sky-100">
               <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                👑 ประธานกรรมการ (Chairman - ผู้จัดการฝ่าย/โรงงาน):
+                👑 ประธานกรรมการ (Chairman - ระดับ {targetRule.committeeLevelRequired || 'Manager'} ขึ้นไป):
               </label>
               <select
                 value={selectedChairmanId}
                 onChange={(e) => setSelectedChairmanId(e.target.value)}
                 className="w-full bg-white border border-sky-200/80 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
-                {mockUsers.filter(u => u.level === 'Manager').map(u => (
+                {mockUsers.map(u => (
                   <option key={u.id} value={u.id}>
-                    {u.name} — {u.position} ({u.department})
+                    {u.name} — {u.position} ({u.department}) [{u.level}]
                   </option>
                 ))}
               </select>

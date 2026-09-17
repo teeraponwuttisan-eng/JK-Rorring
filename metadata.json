@@ -1,0 +1,6 @@
+{
+  "name": "Somboon Procurement Committee System",
+  "description": "ระบบตั้งคณะกรรมการและอนุมัติการสั่งซื้อโครงการ (PM-01) บริษัท สมบูรณ์ แบบ End-to-End Digital Workflow",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
